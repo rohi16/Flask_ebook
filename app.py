@@ -1,36 +1,50 @@
-from flask import Flask, request, jsonify
-import openai
+from flask import Flask, request, send_file
 import os
+from fpdf import FPDF
+import smtplib
+from email.message import EmailMessage
 
 app = Flask(__name__)
 
-# Securely get your OpenAI key from Render environment variable
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+@app.route('/gumroad-ping', methods=['POST'])
+def gumroad_ping():
+    data = request.form
+    email = data.get('email')
+    product_id = data.get('product_id')
 
-@app.route('/')
-def home():
-    return "Welcome to the eBook Generator. Use /generate?topic=your_topic"
+    if product_id == 'https://bathinirohi.gumroad.com/l/imlhv':
+        ebook_path = generate_ebook(email)
+        send_email(email, ebook_path)
 
-@app.route('/generate')
-def generate_ebook():
-    topic = request.args.get('topic')
-    if not topic:
-        return jsonify({"error": "Missing 'topic' parameter in the URL"}), 400
+    return '', 200
 
-    try:
-        prompt = f"Write an engaging introduction for an eBook about {topic}. Keep it informative and useful."
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=500
-        )
+def generate_ebook(email):
+    content = f"Hi {email}, this is your AI-generated eBook!"
+    filename = f"{email}_ebook.pdf"
+    filepath = os.path.join('ebooks', filename)
 
-        ebook_text = response.choices[0].message.content
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, content)
+    pdf.output(filepath)
 
-        return jsonify({
-            "topic": topic,
-            "ebook_intro": ebook_text
-        })
+    return filepath
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+def send_email(to_email, ebook_path):
+    msg = EmailMessage()
+    msg['Subject'] = 'Your AI eBook is Ready'
+    msg['From'] = 'your_email@gmail.com'
+    msg['To'] = to_email
+    msg.set_content('Thanks for your purchase! Your eBook is attached.')
+
+    with open(ebook_path, 'rb') as f:
+        msg.add_attachment(f.read(), maintype='application', subtype='pdf', filename=os.path.basename(ebook_path))
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login('your_email@gmail.com', 'your_app_password')
+        smtp.send_message(msg)
+
+if __name__ == "__main__":
+    os.makedirs('ebooks', exist_ok=True)
+    app.run(debug=True)
