@@ -5,6 +5,9 @@ import smtplib
 from email.message import EmailMessage
 
 app = Flask(__name__)
+@app.route('/')
+def home():
+    return "Welcome to the eBook API Home Page!"
 
 @app.route('/gumroad-ping', methods=['POST'])
 def gumroad_ping():
@@ -40,6 +43,7 @@ def send_email(to_email, ebook_path):
 
     with open(ebook_path, 'rb') as f:
         msg.add_attachment(f.read(), maintype='application', subtype='pdf', filename=os.path.basename(ebook_path))
+        
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
         smtp.login('your_email@gmail.com', 'your_app_password')
